@@ -25,7 +25,7 @@ const postHandler = async (req, res) => {
   const newProduct = new Product({
     name: "sample name",
     slug: "sample-name-" + Math.random(),
-    image: "/image/default-image.svg",
+    image: req.body.image || "/image/default-image.svg",
     price: 0,
     category: "sample category",
     brand: "sample brand",

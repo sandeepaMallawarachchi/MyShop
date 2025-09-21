@@ -37,6 +37,7 @@ const handler = async (req, res) => {
     email,
     password: bcryptjs.hashSync(password),
     isAdmin: false,
+    // isAdmin: req.body.isAdmin || false, 
   });
 
   const user = await newUser.save();
