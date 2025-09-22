@@ -3,6 +3,7 @@ import db from "@/utils/db";
 import NextAuth from "next-auth/next";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
+import GithubProvider from "next-auth/providers/github";
 import bcryptjs from "bcryptjs";
 
 export default NextAuth({
@@ -11,30 +12,36 @@ export default NextAuth({
   },
   callbacks: {
     async jwt({ token, user, account, profile }) {
-      // For Credentials login
+      //  Credentials login
       if (user?._id) {
         token._id = user._id;
         token.isAdmin = user.isAdmin;
       }
 
-      // For Google login
-      if (account?.provider === "google") {
+      //  Google or GitHub login
+      if (account?.provider === "google" || account?.provider === "github") {
         await db.connect();
+
         let existingUser = await User.findOne({ email: profile.email });
 
         if (!existingUser) {
-          // create new user in DB
+          // GitHub sometimes doesn’t provide email if it’s private → handle that
+          const email =
+            profile.email ||
+            `${profile.id}@github.temp`; // fallback for GitHub private emails
+
           existingUser = await User.create({
-            name: profile.name,
-            email: profile.email,
-            password: bcryptjs.hashSync(Math.random().toString(36).slice(-8)), // random password
+            name: profile.name || profile.login, // GitHub: profile.login = username
+            email,
+            password: bcryptjs.hashSync(Math.random().toString(36).slice(-8)), // random password placeholder
             isAdmin: false,
           });
         }
 
         token._id = existingUser._id;
         token.isAdmin = existingUser.isAdmin;
-        token.provider = "google";
+        token.provider = account.provider;
+
         await db.disconnect();
       }
 
@@ -48,7 +55,7 @@ export default NextAuth({
     },
   },
   providers: [
-    // Credentials login
+    //  Credentials login
     CredentialsProvider({
       async authorize(credentials) {
         await db.connect();
@@ -67,10 +74,16 @@ export default NextAuth({
       },
     }),
 
-    // Google OAuth login
+    //  Google OAuth
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    }),
+
+    //  GitHub OAuth
+    GithubProvider({
+      clientId: process.env.GITHUB_CLIENT_ID,
+      clientSecret: process.env.GITHUB_CLIENT_SECRET,
     }),
   ],
 });

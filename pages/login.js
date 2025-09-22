@@ -47,6 +47,8 @@ export default function Login() {
         className="mx-auto max-w-screen-md"
       >
         <h1 className="mb-4 text-xl">Login</h1>
+
+        {/* Email/password login */}
         <div className="mb-4">
           <label htmlFor="email">Email</label>
           <input
@@ -88,7 +90,7 @@ export default function Login() {
           <button className="primary-button">Login</button>
         </div>
 
-        {/* ✅ New Google login button */}
+        {/* ✅ Google login button */}
         <div className="mb-4">
           <button
             type="button"
@@ -99,6 +101,18 @@ export default function Login() {
           </button>
         </div>
 
+        {/* ✅ GitHub login button */}
+        <div className="mb-4">
+          <button
+            type="button"
+            onClick={() => signIn("github", { callbackUrl: redirect || "/" })}
+            className="w-full bg-gray-800 text-white py-2 px-4 rounded"
+          >
+            Sign in with GitHub
+          </button>
+        </div>
+
+        {/* Register link */}
         <div className="mb-4">
           Don&apos;t have an account? &nbsp;
           <Link href={`/register?redirect=${redirect || "/"}`}>Register</Link>
