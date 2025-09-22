@@ -1,11 +1,11 @@
+import { signIn, useSession } from "next-auth/react";
+import { useRouter } from "next/router";
+import { toast } from "react-toastify";
+import { useForm } from "react-hook-form";
 import Layout from "@/components/Layout";
 import Link from "next/link";
-import { signIn, useSession } from "next-auth/react";
 import React, { useEffect } from "react";
-import { useForm } from "react-hook-form";
 import { getError } from "@/utils/error";
-import { toast } from "react-toastify";
-import { useRouter } from "next/router";
 
 export default function Login() {
   const { data: session } = useSession();
@@ -21,7 +21,6 @@ export default function Login() {
   const {
     register,
     handleSubmit,
-    watch,
     formState: { errors },
   } = useForm();
 
@@ -54,7 +53,6 @@ export default function Login() {
             type="text"
             {...register("email", {
               required: "Please enter email",
-
               pattern: {
                 value: /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+.[a-zA-Z0-9-.]+$/i,
                 message: "Please enter valid email",
@@ -63,7 +61,7 @@ export default function Login() {
             className="w-full"
             id="email"
             autoFocus
-          ></input>
+          />
           {errors.email && (
             <div className="text-red-500">{errors.email.message}</div>
           )}
@@ -81,7 +79,7 @@ export default function Login() {
             })}
             className="w-full"
             id="password"
-          ></input>
+          />
           {errors.password && (
             <div className="text-red-500">{errors.password.message}</div>
           )}
@@ -89,6 +87,18 @@ export default function Login() {
         <div className="mb-4">
           <button className="primary-button">Login</button>
         </div>
+
+        {/* ✅ New Google login button */}
+        <div className="mb-4">
+          <button
+            type="button"
+            onClick={() => signIn("google", { callbackUrl: redirect || "/" })}
+            className="w-full bg-green-500 text-white py-2 px-4 rounded"
+          >
+            Sign in with Google
+          </button>
+        </div>
+
         <div className="mb-4">
           Don&apos;t have an account? &nbsp;
           <Link href={`/register?redirect=${redirect || "/"}`}>Register</Link>
