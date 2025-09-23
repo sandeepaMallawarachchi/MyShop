@@ -11,29 +11,37 @@ export default NextAuth({
     strategy: "jwt",
   },
   callbacks: {
+    // 🔑 Runs when JWT is created/updated
     async jwt({ token, user, account, profile }) {
-      //  Credentials login
+      // Credentials login → attach data
       if (user?._id) {
         token._id = user._id;
         token.isAdmin = user.isAdmin;
       }
 
-      //  Google or GitHub login
+      // Google or GitHub login
       if (account?.provider === "google" || account?.provider === "github") {
         await db.connect();
 
-        let existingUser = await User.findOne({ email: profile.email });
+        let email = profile?.email;
+
+        // 🔐 GitHub: handle missing email
+        if (!email && account.provider === "github") {
+          // Fallback → reject login if email missing
+          await db.disconnect();
+          throw new Error(
+            "GitHub account does not have a public email. Please make it public in GitHub settings."
+          );
+        }
+
+        let existingUser = await User.findOne({ email });
 
         if (!existingUser) {
-          // GitHub sometimes doesn’t provide email if it’s private → handle that
-          const email =
-            profile.email ||
-            `${profile.id}@github.temp`; // fallback for GitHub private emails
-
+          // ✅ Create user if not exists
           existingUser = await User.create({
-            name: profile.name || profile.login, // GitHub: profile.login = username
+            name: profile.name || profile.login, // GitHub fallback
             email,
-            password: bcryptjs.hashSync(Math.random().toString(36).slice(-8)), // random password placeholder
+            password: null, // no password for OAuth users
             isAdmin: false,
           });
         }
@@ -47,6 +55,8 @@ export default NextAuth({
 
       return token;
     },
+
+    // 🔑 Add user data into session
     async session({ session, token }) {
       if (token?._id) session.user._id = token._id;
       if (token?.isAdmin) session.user.isAdmin = token.isAdmin;
@@ -54,8 +64,9 @@ export default NextAuth({
       return session;
     },
   },
+
   providers: [
-    //  Credentials login
+    // Credentials login
     CredentialsProvider({
       async authorize(credentials) {
         await db.connect();
@@ -74,13 +85,13 @@ export default NextAuth({
       },
     }),
 
-    //  Google OAuth
+    // Google OAuth
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     }),
 
-    //  GitHub OAuth
+    // GitHub OAuth
     GithubProvider({
       clientId: process.env.GITHUB_CLIENT_ID,
       clientSecret: process.env.GITHUB_CLIENT_SECRET,

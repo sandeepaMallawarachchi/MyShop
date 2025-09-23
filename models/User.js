@@ -10,10 +10,12 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
       unique: true,
+      lowercase: true, // ensures consistency for Google/GitHub logins
+      trim: true,
     },
     password: {
       type: String,
-      required: true,
+      required: false, // ✅ allow null for OAuth users
     },
     isAdmin: {
       type: Boolean,
