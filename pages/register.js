@@ -41,37 +41,19 @@ export default function Register() {
     4: { label: "Strong", color: "bg-green-500", textColor: "text-green-600" },
   };
 
-  // Password validation function
+  // Password validation function using only zxcvbn
   const validatePassword = (password) => {
     if (!password) return "Password is required";
-    
-    // Minimum length check
-    if (password.length < 8) {
-      return "Password must be at least 8 characters long";
-    }
-    
-    // Character type requirements
-    const hasUppercase = /[A-Z]/.test(password);
-    const hasLowercase = /[a-z]/.test(password);
-    const hasNumbers = /\d/.test(password);
-    const hasSymbols = /[!@#$%^&*(),.?":{}|<>]/.test(password);
-    
-    const missingTypes = [];
-    if (!hasUppercase) missingTypes.push("uppercase letter");
-    if (!hasLowercase) missingTypes.push("lowercase letter");
-    if (!hasNumbers) missingTypes.push("number");
-    if (!hasSymbols) missingTypes.push("symbol");
-    
-    if (missingTypes.length > 0) {
-      return `Password must contain at least one ${missingTypes.join(", ")}`;
-    }
-    
-    // Check password strength using zxcvbn
+
+    // Use only zxcvbn for password validation
     const strength = zxcvbn(password);
     if (strength.score < 2) {
-      return "Password is too weak. Please choose a stronger password";
+      // Return the first suggestion from zxcvbn if available, otherwise generic message
+      return strength.feedback.suggestions.length > 0
+        ? strength.feedback.suggestions[0]
+        : "Password is too weak. Please choose a stronger password";
     }
-    
+
     return true;
   };
 
@@ -94,10 +76,10 @@ export default function Register() {
   // Render password strength indicator
   const renderPasswordStrength = () => {
     if (!passwordValue) return null;
-    
+
     const config = strengthConfig[passwordStrength.score];
     const widthPercentage = ((passwordStrength.score + 1) / 5) * 100;
-    
+
     return (
       <div className="mt-2">
         <div className="flex justify-between items-center mb-1">
@@ -118,9 +100,11 @@ export default function Register() {
           <div className="mt-1">
             <p className="text-xs text-gray-600">Suggestions:</p>
             <ul className="text-xs text-gray-600 list-disc list-inside">
-              {passwordStrength.feedback.suggestions.map((suggestion, index) => (
-                <li key={index}>{suggestion}</li>
-              ))}
+              {passwordStrength.feedback.suggestions.map(
+                (suggestion, index) => (
+                  <li key={index}>{suggestion}</li>
+                )
+              )}
             </ul>
           </div>
         )}
@@ -150,16 +134,16 @@ export default function Register() {
                 </label>
                 <input
                   type="text"
-                  {...register("name", { 
+                  {...register("name", {
                     required: "Full name is required",
                     minLength: {
                       value: 2,
-                      message: "Name must be at least 2 characters"
+                      message: "Name must be at least 2 characters",
                     },
                     pattern: {
                       value: /^[a-zA-Z\s]+$/,
-                      message: "Name can only contain letters and spaces"
-                    }
+                      message: "Name can only contain letters and spaces",
+                    },
                   })}
                   className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                   id="name"
@@ -212,7 +196,7 @@ export default function Register() {
                 <input
                   type="password"
                   {...register("password", {
-                    validate: validatePassword
+                    validate: validatePassword,
                   })}
                   className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                   id="password"
@@ -223,35 +207,39 @@ export default function Register() {
                     {errors.password.message}
                   </p>
                 )}
-                
+
                 {/* Password Strength Indicator */}
                 {renderPasswordStrength()}
-                
-                {/* Password Requirements */}
+
+                {/* Password Requirements - Dynamic based on zxcvbn feedback */}
                 <div className="mt-2">
-                  <p className="text-xs text-gray-600 font-medium mb-1">Password must contain:</p>
-                  <div className="grid grid-cols-2 gap-1 text-xs text-gray-500">
-                    <div className={`flex items-center ${passwordValue && passwordValue.length >= 8 ? 'text-green-600' : 'text-gray-500'}`}>
-                      <span className="mr-1">{passwordValue && passwordValue.length >= 8 ? '✓' : '•'}</span>
-                      8+ characters
-                    </div>
-                    <div className={`flex items-center ${passwordValue && /[A-Z]/.test(passwordValue) ? 'text-green-600' : 'text-gray-500'}`}>
-                      <span className="mr-1">{passwordValue && /[A-Z]/.test(passwordValue) ? '✓' : '•'}</span>
-                      Uppercase letter
-                    </div>
-                    <div className={`flex items-center ${passwordValue && /[a-z]/.test(passwordValue) ? 'text-green-600' : 'text-gray-500'}`}>
-                      <span className="mr-1">{passwordValue && /[a-z]/.test(passwordValue) ? '✓' : '•'}</span>
-                      Lowercase letter
-                    </div>
-                    <div className={`flex items-center ${passwordValue && /\d/.test(passwordValue) ? 'text-green-600' : 'text-gray-500'}`}>
-                      <span className="mr-1">{passwordValue && /\d/.test(passwordValue) ? '✓' : '•'}</span>
-                      Number
-                    </div>
-                    <div className={`flex items-center ${passwordValue && /[!@#$%^&*(),.?":{}|<>]/.test(passwordValue) ? 'text-green-600' : 'text-gray-500'}`}>
-                      <span className="mr-1">{passwordValue && /[!@#$%^&*(),.?":{}|<>]/.test(passwordValue) ? '✓' : '•'}</span>
-                      Symbol
-                    </div>
-                  </div>
+                  <p className="text-xs text-gray-600 font-medium mb-1">
+                    Password strength tips:
+                  </p>
+                  {passwordStrength?.feedback?.warning && (
+                    <p className="text-xs text-orange-600 mb-1">
+                      ⚠️ {passwordStrength.feedback.warning}
+                    </p>
+                  )}
+
+                  {passwordStrength?.feedback?.suggestions?.length > 0 && (
+                    <ul className="text-xs text-gray-600 space-y-1">
+                      {passwordStrength.feedback.suggestions.map(
+                        (suggestion, index) => (
+                          <li key={index} className="flex items-start">
+                            <span className="mr-1 text-blue-500">💡</span>
+                            {suggestion}
+                          </li>
+                        )
+                      )}
+                    </ul>
+                  )}
+                  {!passwordValue && (
+                    <p className="text-xs text-gray-500">
+                      💡 Choose a password that's hard to guess but easy for you
+                      to remember
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -273,7 +261,7 @@ export default function Register() {
                         return "Passwords do not match";
                       }
                       return true;
-                    }
+                    },
                   })}
                   className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                   id="confirmPassword"
