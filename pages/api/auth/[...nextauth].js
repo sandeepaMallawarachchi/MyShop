@@ -41,9 +41,20 @@ export default NextAuth({
 
         console.log("findOne called");
         console.log("findOne running...");
-        const user = await User.findOne({
-          email: creadentials.email,
-        });
+        // const user = await User.findOne({
+        //   email: creadentials.email,
+        // });
+
+        if (typeof creadentials.email !== "string" ||
+          !/^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$/i.test(creadentials.email)) {
+          throw new Error("Invalid email format");
+        }
+
+        if (typeof creadentials.password !== "string" || creadentials.password.length < 6) {
+          throw new Error("Invalid password");
+        }
+
+        const user = await User.findOne({ email: creadentials.email }).lean();
 
         console.log("user is:-", user);
 

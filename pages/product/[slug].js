@@ -10,6 +10,7 @@ import { useRouter } from "next/router";
 import React, { useContext, useState } from "react";
 import ReactStars from "react-rating-stars-component";
 import { toast } from "react-toastify";
+import { generateCsrfToken } from "@/utils/csrf";
 
 export default function ProductDetail(props) {
   const { product } = props;
@@ -134,14 +135,17 @@ export default function ProductDetail(props) {
 export async function getServerSideProps(context) {
   const { params } = context;
   const { slug } = params;
+
   await db.connect();
-  const product = await Product.findOne({
-    slug: slug,
-  }).lean();
+  const product = await Product.findOne({ slug }).lean();
   await db.disconnect();
+
+  const csrfToken = generateCsrfToken();
+
   return {
     props: {
       product: product ? db.convertDocToObj(product) : null,
+      csrfToken,
     },
   };
 }
