@@ -93,6 +93,7 @@ export default function ProductEditScreen() {
     brand,
     countInStock,
     description,
+    csrfToken,
   }) => {
     try {
       dispatch({ type: "UPDATE_REQUEST" });
@@ -105,7 +106,14 @@ export default function ProductEditScreen() {
         brand,
         countInStock,
         description,
-      });
+        csrfToken,
+      },
+        {
+          headers: {
+            "x-csrf-token": csrfToken,
+          },
+        }
+      );
       dispatch({ type: "UPDATE_SUCCESS" });
       toast.success("Product updated successfully");
       router.push("/admin/products");
@@ -317,6 +325,9 @@ export default function ProductEditScreen() {
                   </div>
                 )}
               </div>
+
+              <input type="hidden" value={csrfToken} {...register("csrfToken")} />
+
               <div className="mb-4">
                 <button disabled={loadingUpdate} className="primary-button">
                   {loadingUpdate ? "Loading" : "Update"}

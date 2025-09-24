@@ -1,12 +1,19 @@
 import Product from "@/models/Product";
 import db from "@/utils/db";
 import { getSession } from "next-auth/react";
+import { verifyCsrfToken } from "@/utils/csrf";
 
 const handler = async (req, res) => {
   const session = await getSession({ req });
   if (!session || (session && !session.user.isAdmin)) {
     res.status(401).send("Admin signin required");
   }
+
+  const csrfToken = req.headers["x-csrf-token"] || req.body.csrfToken;
+  if (!verifyCsrfToken(csrfToken)) {
+    return res.status(403).send("Invalid CSRF token");
+  }
+
   if (req.method === "GET") {
     return getHandler(req, res);
   } else if (req.method === "PUT") {
