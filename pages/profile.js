@@ -18,6 +18,8 @@ export default function Profile() {
   const [otpVerified, setOtpVerified] = useState(false);
   const [otpLoading, setOtpLoading] = useState(false);
 
+  const isOAuthUser = session?.user?.provider === "google" || session?.user?.provider === "github";
+
   const {
     handleSubmit,
     register,
@@ -253,6 +255,7 @@ export default function Profile() {
             </div>
 
             {/* Password Change Toggle */}
+            {!isOAuthUser && (
             <div className="border-t pt-6">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-medium text-gray-900">
@@ -277,6 +280,7 @@ export default function Profile() {
                 )}
               </div>
             </div>
+            )}
 
             {/* Password Change Section */}
             {changePassword && (
