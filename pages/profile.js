@@ -14,6 +14,10 @@ export default function Profile() {
   const [changePassword, setChangePassword] = useState(false);
   const [initialName, setInitialName] = useState("");
 
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpVerified, setOtpVerified] = useState(false);
+  const [otpLoading, setOtpLoading] = useState(false);
+
   const {
     handleSubmit,
     register,
@@ -35,25 +39,26 @@ export default function Profile() {
   const nameValue = watch("name");
   const passwordValue = watch("password");
   const confirmPasswordValue = watch("confirmPassword");
-  
+
   const passwordStrength = passwordValue ? zxcvbn(passwordValue) : { score: 0 };
 
   // Check if name has changed
   const hasNameChanged = nameValue !== initialName;
 
   // Check if password fields are valid and strong enough
-  const isPasswordValid = changePassword ? (
-    passwordValue && 
-    confirmPasswordValue &&
-    passwordValue === confirmPasswordValue &&
-    passwordStrength.score >= 2
-  ) : true;
+  const isPasswordValid = changePassword
+    ? passwordValue &&
+      confirmPasswordValue &&
+      passwordValue === confirmPasswordValue &&
+      passwordStrength.score >= 2
+    : true;
 
   // Check if OTP button should be enabled (only for password change scenario)
   const isOtpButtonEnabled = changePassword && isPasswordValid;
 
-  // Check if Save Changes button should be enabled
-  const isSaveButtonEnabled = hasNameChanged || (changePassword && isPasswordValid);
+  // Save only if name changed OR (password valid + OTP verified)
+  const isSaveButtonEnabled =
+    hasNameChanged || (changePassword && isPasswordValid && otpVerified);
 
   const strengthConfig = {
     0: { label: "Very Weak", color: "bg-red-500", textColor: "text-red-600" },
@@ -83,6 +88,7 @@ export default function Profile() {
       });
 
       toast.success("Profile updated successfully");
+      logoutClickHandler();
 
       if (changePassword && password) {
         const result = await signIn("credentials", {
@@ -93,7 +99,9 @@ export default function Profile() {
         if (result.error) {
           toast.error(result.error);
         }
-        logoutClickHandler();
+        if (changePassword && password) {
+          logoutClickHandler();
+        }
       }
     } catch (error) {
       toast.error(getError(error));
@@ -109,10 +117,36 @@ export default function Profile() {
 
   const handleOtpRequest = async () => {
     try {
-      // Add your OTP request logic here
-      toast.info("OTP has been sent to your email");
+      setOtpLoading(true); // show loading state
+      const { data } = await axios.post("/api/auth/send-otp", {
+        email: session.user.email,
+      });
+
+      toast.success("OTP sent to your email");
+      setOtpSent(true); // show OTP input
     } catch (error) {
       toast.error("Failed to send OTP");
+    } finally {
+      setOtpLoading(false); // reset loading
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    try {
+      const otpValue = getValues("otp");
+      const { data } = await axios.post("/api/auth/verify-otp", {
+        email: session.user.email,
+        otp: otpValue,
+      });
+
+      if (data.success) {
+        toast.success("OTP verified successfully");
+        setOtpVerified(true); // allow password update
+      } else {
+        toast.error("Invalid or expired OTP");
+      }
+    } catch (error) {
+      toast.error("Failed to verify OTP");
     }
   };
 
@@ -164,22 +198,27 @@ export default function Profile() {
     <Layout title="Profile">
       <div className="mx-auto max-w-screen-md">
         <div className="bg-white shadow-sm rounded-lg p-6">
-          <h1 className="mb-6 text-2xl font-semibold text-gray-900">Update Profile</h1>
+          <h1 className="mb-6 text-2xl font-semibold text-gray-900">
+            Update Profile
+          </h1>
 
           <form onSubmit={handleSubmit(submitHandler)} className="space-y-6">
             {/* Name Field */}
             <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
+              <label
+                htmlFor="name"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
                 Full Name
               </label>
               <input
                 type="text"
-                {...register("name", { 
+                {...register("name", {
                   required: "Please enter your name",
                   minLength: {
                     value: 2,
-                    message: "Name must be at least 2 characters long"
-                  }
+                    message: "Name must be at least 2 characters long",
+                  },
                 })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
                 id="name"
@@ -187,13 +226,18 @@ export default function Profile() {
                 placeholder="Enter your full name"
               />
               {errors.name && (
-                <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
+                <p className="mt-1 text-sm text-red-600">
+                  {errors.name.message}
+                </p>
               )}
             </div>
 
             {/* Email Field - Disabled */}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
                 Email Address
               </label>
               <input
@@ -211,7 +255,9 @@ export default function Profile() {
             {/* Password Change Toggle */}
             <div className="border-t pt-6">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-medium text-gray-900">Password Settings</h3>
+                <h3 className="text-lg font-medium text-gray-900">
+                  Password Settings
+                </h3>
                 {!changePassword ? (
                   <button
                     type="button"
@@ -235,11 +281,16 @@ export default function Profile() {
             {/* Password Change Section */}
             {changePassword && (
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 space-y-4">
-                <h4 className="text-md font-medium text-gray-900 mb-4">Update Password</h4>
-                
+                <h4 className="text-md font-medium text-gray-900 mb-4">
+                  Update Password
+                </h4>
+
                 {/* New Password */}
                 <div>
-                  <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label
+                    htmlFor="password"
+                    className="block text-sm font-medium text-gray-700 mb-2"
+                  >
                     New Password
                   </label>
                   <input
@@ -250,21 +301,27 @@ export default function Profile() {
                     placeholder="Enter new password"
                   />
                   {errors.password && (
-                    <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
+                    <p className="mt-1 text-sm text-red-600">
+                      {errors.password.message}
+                    </p>
                   )}
                   {renderPasswordStrength()}
                 </div>
 
                 {/* Confirm Password */}
                 <div>
-                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label
+                    htmlFor="confirmPassword"
+                    className="block text-sm font-medium text-gray-700 mb-2"
+                  >
                     Confirm New Password
                   </label>
                   <input
                     type="password"
                     {...register("confirmPassword", {
                       validate: (value) =>
-                        value === getValues("password") || "Passwords do not match",
+                        value === getValues("password") ||
+                        "Passwords do not match",
                     })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
                     id="confirmPassword"
@@ -275,34 +332,63 @@ export default function Profile() {
                       {errors.confirmPassword.message}
                     </p>
                   )}
-                  {confirmPasswordValue && passwordValue && confirmPasswordValue === passwordValue && (
-                    <p className="mt-1 text-sm text-green-600 flex items-center">
-                      <span className="mr-1">✓</span>
-                      Passwords match
-                    </p>
-                  )}
+                  {confirmPasswordValue &&
+                    passwordValue &&
+                    confirmPasswordValue === passwordValue && (
+                      <p className="mt-1 text-sm text-green-600 flex items-center">
+                        <span className="mr-1">✓</span>
+                        Passwords match
+                      </p>
+                    )}
                 </div>
+                {otpSent && !otpVerified && (
+                  <div className="mt-4">
+                    <label
+                      htmlFor="otp"
+                      className="block text-sm font-medium text-gray-700 mb-2"
+                    >
+                      Enter OTP
+                    </label>
+                    <input
+                      type="text"
+                      {...register("otp", { required: "Please enter OTP" })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      id="otp"
+                      placeholder="Enter the OTP sent to your email"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleVerifyOtp}
+                      className="mt-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                    >
+                      Verify OTP
+                    </button>
+                  </div>
+                )}
 
                 {/* OTP Button */}
-                <div className="pt-2">
-                  <button
-                    type="button"
-                    onClick={handleOtpRequest}
-                    disabled={!isOtpButtonEnabled}
-                    className={`inline-flex items-center px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                      isOtpButtonEnabled
-                        ? "text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                        : "text-gray-400 bg-gray-200 cursor-not-allowed"
-                    }`}
-                  >
-                    Get OTP for Password Change
-                  </button>
-                  {!isOtpButtonEnabled && changePassword && (
-                    <p className="mt-2 text-xs text-gray-500">
-                      OTP button will be enabled when password is strong enough and passwords match.
-                    </p>
-                  )}
-                </div>
+                {!otpSent && ( // hide after OTP sent
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={handleOtpRequest}
+                      disabled={!isOtpButtonEnabled || otpLoading}
+                      className={`inline-flex items-center px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                        isOtpButtonEnabled && !otpLoading
+                          ? "text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                          : "text-gray-400 bg-gray-200 cursor-not-allowed"
+                      }`}
+                    >
+                      {otpLoading ? "Sending OTP..." : "Get an OTP"}
+                    </button>
+                    {!isOtpButtonEnabled && changePassword && (
+                      <p className="mt-2 text-xs text-gray-500">
+                        OTP button will be enabled when password is strong
+                        enough and passwords match.
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -312,8 +398,13 @@ export default function Profile() {
                 <div>
                   {!isSaveButtonEnabled && (
                     <p className="text-sm text-gray-500">
-                      {!hasNameChanged && !changePassword && "Make changes to your name or password to enable saving."}
-                      {!hasNameChanged && changePassword && !isPasswordValid && "Complete password requirements to enable saving."}
+                      {!hasNameChanged &&
+                        !changePassword &&
+                        "Make changes to your name or password to enable saving."}
+                      {!hasNameChanged &&
+                        changePassword &&
+                        !isPasswordValid &&
+                        "Complete password requirements to enable saving."}
                     </p>
                   )}
                 </div>

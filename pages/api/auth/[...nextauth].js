@@ -67,23 +67,32 @@ export default NextAuth({
 
   providers: [
     // Credentials login
-    CredentialsProvider({
-      async authorize(credentials) {
-        await db.connect();
-        const user = await User.findOne({ email: credentials.email });
-        await db.disconnect();
+   CredentialsProvider({
+  async authorize(credentials) {
+    await db.connect();
+    const user = await User.findOne({ email: credentials.email });
+    await db.disconnect();
 
-        if (user && bcryptjs.compareSync(credentials.password, user.password)) {
-          return {
-            _id: user._id,
-            name: user.name,
-            email: user.email,
-            isAdmin: user.isAdmin,
-          };
-        }
-        throw new Error("Invalid email or password");
-      },
-    }),
+    if (!user) throw new Error("Invalid email or password");
+
+    // If user has no password (OAuth only), block credentials login
+    if (!user.password) {
+      throw new Error("This account is registered via Google/GitHub. Please log in with that provider.");
+    }
+
+    // Compare hashed password
+    const isValid = await bcryptjs.compare(credentials.password, user.password);
+    if (!isValid) throw new Error("Invalid email or password");
+
+    return {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      isAdmin: user.isAdmin,
+    };
+  },
+}),
+
 
     // Google OAuth
     GoogleProvider({

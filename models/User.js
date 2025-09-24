@@ -22,6 +22,15 @@ const userSchema = new mongoose.Schema(
       required: true,
       default: false,
     },
+    // 🔐 OTP fields for password reset / verification
+    otp: {
+      type: String,
+      required: false,
+    },
+    otpExpires: {
+      type: Date,
+      required: false,
+    },
   },
   {
     timestamps: true,
