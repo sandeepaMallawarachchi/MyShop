@@ -107,7 +107,13 @@ export default function ProductEditScreen() {
         countInStock,
         description,
         csrfToken,
-      });
+      },
+        {
+          headers: {
+            "x-csrf-token": csrfToken,
+          },
+        }
+      );
       dispatch({ type: "UPDATE_SUCCESS" });
       toast.success("Product updated successfully");
       router.push("/admin/products");
