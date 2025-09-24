@@ -93,6 +93,7 @@ export default function ProductEditScreen() {
     brand,
     countInStock,
     description,
+    csrfToken,
   }) => {
     try {
       dispatch({ type: "UPDATE_REQUEST" });
