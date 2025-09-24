@@ -4,48 +4,37 @@ import db from "@/utils/db";
 import { getSession } from "next-auth/react";
 
 const handler = async (req, res) => {
-  if (req.method != "PUT") {
-    return res.status(400).send({
-      message: `${req.method} not supported`,
-    });
+  if (req.method !== "PUT") {
+    return res.status(400).send({ message: `${req.method} not supported` });
   }
 
   const session = await getSession({ req });
   if (!session) {
-    res.status(401).send("Signin required");
+    return res.status(401).send("Signin required");
   }
+
   const { user } = session;
   const { name, email, password } = req.body;
 
-  if (
-    !name ||
-    !email ||
-    !email.includes("@") ||
-    !password ||
-    password.trim().length < 5
-  ) {
-    res.status(422).json({
-      message: "Validation error",
-    });
-    return;
+  await db.connect();
+  const toUpdateUser = await User.findById(user._id);
+
+  if (!toUpdateUser) {
+    await db.disconnect();
+    return res.status(404).send({ message: "User not found" });
   }
 
-  await db.connect();
-
-  const toUpdateUser = await User.findById(user._id);
-  toUpdateUser.name = name;
-  toUpdateUser.email = email;
-  if (password) {
-    toUpdateUser.password = bcryptjs.hashSync(password);
+  //  Only update provided fields
+  if (name) toUpdateUser.name = name;
+  if (email) toUpdateUser.email = email;
+  if (password && password.trim().length >= 8) {
+    toUpdateUser.password = bcryptjs.hashSync(password, 12); 
   }
 
   await toUpdateUser.save();
-
   await db.disconnect();
 
-  res.send({
-    message: "User updated",
-  });
+  res.send({ message: "User updated" });
 };
 
 export default handler;
