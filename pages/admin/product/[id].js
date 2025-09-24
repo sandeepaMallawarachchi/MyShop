@@ -105,6 +105,7 @@ export default function ProductEditScreen() {
         brand,
         countInStock,
         description,
+        csrfToken,
       });
       dispatch({ type: "UPDATE_SUCCESS" });
       toast.success("Product updated successfully");
@@ -317,6 +318,9 @@ export default function ProductEditScreen() {
                   </div>
                 )}
               </div>
+
+              <input type="hidden" value={csrfToken} {...register("csrfToken")} />
+
               <div className="mb-4">
                 <button disabled={loadingUpdate} className="primary-button">
                   {loadingUpdate ? "Loading" : "Update"}
