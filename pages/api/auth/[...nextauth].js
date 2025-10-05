@@ -11,7 +11,7 @@ export default NextAuth({
     strategy: "jwt",
   },
   callbacks: {
-    // 🔑 Runs when JWT is created/updated
+    //  Runs when JWT is created/updated
     async jwt({ token, user, account, profile }) {
       // Credentials login → attach data
       if (user?._id) {
@@ -25,7 +25,7 @@ export default NextAuth({
 
         let email = profile?.email;
 
-        // 🔐 GitHub: handle missing email
+        //  GitHub: handle missing email
         if (!email && account.provider === "github") {
           // Fallback → reject login if email missing
           await db.disconnect();
@@ -37,7 +37,7 @@ export default NextAuth({
         let existingUser = await User.findOne({ email });
 
         if (!existingUser) {
-          // ✅ Create user if not exists
+          //  Create user if not exists
           existingUser = await User.create({
             name: profile.name || profile.login, // GitHub fallback
             email,
@@ -56,7 +56,7 @@ export default NextAuth({
       return token;
     },
 
-    // 🔑 Add user data into session
+    //  Add user data into session
     async session({ session, token }) {
       if (token?._id) session.user._id = token._id;
       if (token?.isAdmin) session.user.isAdmin = token.isAdmin;
