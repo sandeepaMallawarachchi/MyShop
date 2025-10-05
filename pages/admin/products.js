@@ -3,7 +3,7 @@ import { getError } from "@/utils/error";
 import axios from "axios";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import React, { useEffect, useReducer } from "react";
+import React, { useEffect, useReducer, useState } from "react";
 import { toast } from "react-toastify";
 
 function reducer(state, action) {
@@ -58,13 +58,19 @@ export default function Products() {
     successDelete: false,
   });
 
+  const [csrfToken, setCsrfToken] = useState("");
   const router = useRouter();
 
   useEffect(() => {
     const fetchData = async () => {
       try {
+        const { data: csrf } = await axios.get("/api/auth/csrf-token");
+        setCsrfToken(csrf.csrfToken);
+
         dispatch({ type: "FETCH_REQUEST" });
-        const { data } = await axios.get(`/api/admin/products`);
+        const { data } = await axios.get(`/api/admin/products`, {
+          headers: { "x-csrf-token": csrf.csrfToken },
+        });
         dispatch({ type: "FETCH_SUCCESS", payload: data });
       } catch (err) {
         dispatch({ type: "FETCH_FAIL", payload: getError(err) });
@@ -79,14 +85,14 @@ export default function Products() {
   }, [successDelete]);
 
   const createHandler = async () => {
-    if (!window.confirm("Are you sure")) {
-      return;
-    }
+    if (!window.confirm("Are you sure")) return;
     try {
       dispatch({ type: "CREATE_REQUEST" });
-      const { data } = await axios.post(`/api/admin/products`);
+      const { data } = await axios.post(`/api/admin/products`, {}, {
+        headers: { "x-csrf-token": csrfToken },
+      });
       dispatch({ type: "CREATE_SUCCESS" });
-      toast.success("Product created succssfully");
+      toast.success("Product created successfully");
       router.push(`/admin/product/${data.product._id}`);
     } catch (error) {
       dispatch({ type: "CREATE_FAIL" });
@@ -95,14 +101,14 @@ export default function Products() {
   };
 
   const deletHandler = async (productId) => {
-    if (!window.confirm("Are you sure?")) {
-      return;
-    }
+    if (!window.confirm("Are you sure?")) return;
     try {
       dispatch({ type: "DELETE_REQUEST" });
-      await axios.delete(`/api/admin/products/${productId}`);
+      await axios.delete(`/api/admin/products/${productId}`, {
+        headers: { "x-csrf-token": csrfToken },
+      });
       dispatch({ type: "DELETE_SUCCESS" });
-      toast.success("Product deleted succssfully");
+      toast.success("Product deleted successfully");
     } catch (error) {
       dispatch({ type: "DELETE_FAIL" });
       toast.error(getError(error));
