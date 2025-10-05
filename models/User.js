@@ -10,15 +10,26 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
       unique: true,
+      lowercase: true, // ensures consistency for Google/GitHub logins
+      trim: true,
     },
     password: {
       type: String,
-      required: true,
+      required: false, // ✅ allow null for OAuth users
     },
     isAdmin: {
       type: Boolean,
       required: true,
       default: false,
+    },
+    // 🔐 OTP fields for password reset / verification
+    otp: {
+      type: String,
+      required: false,
+    },
+    otpExpires: {
+      type: Date,
+      required: false,
     },
   },
   {

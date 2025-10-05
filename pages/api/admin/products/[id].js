@@ -5,6 +5,7 @@ import Order from "@/models/Order";
 import db from "@/utils/db";
 import { getSession } from "next-auth/react";
 import { auditLogger } from "@/utils/auditLogger";
+import { verifyCsrfToken } from "@/utils/csrf";
 
 const handler = async (req, res) => {
   // [BROKEN ACCESS CONTROL FIX] - Enhanced admin validation
