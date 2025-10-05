@@ -2,6 +2,8 @@ import User from "@/models/User";
 import db from "@/utils/db";
 import NextAuth from "next-auth/next";
 import CredentialsProvider from "next-auth/providers/credentials";
+import GoogleProvider from "next-auth/providers/google";
+import GithubProvider from "next-auth/providers/github";
 import bcryptjs from "bcryptjs";
 
 export default NextAuth({
@@ -9,75 +11,120 @@ export default NextAuth({
     strategy: "jwt",
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, account, profile }) {
+      // Credentials login → attach data
       if (user?._id) {
         token._id = user._id;
+        token.isAdmin = user.isAdmin;
       }
 
-      if (user?.isAdmin) {
-        token.isAdmin = user.isAdmin;
+      // Google or GitHub login
+      if (account?.provider === "google" || account?.provider === "github") {
+        await db.connect();
+
+        let email = profile?.email;
+
+        if (!email && account.provider === "github") {
+          // Fallback → reject login if email missing
+          await db.disconnect();
+          throw new Error(
+            "GitHub account does not have a public email. Please make it public in GitHub settings."
+          );
+        }
+
+        let existingUser = await User.findOne({ email });
+
+        if (!existingUser) {
+          existingUser = await User.create({
+            name: profile.name || profile.login, // GitHub fallback
+            email,
+            password: null, // no password for OAuth users
+            isAdmin: false,
+          });
+        }
+
+        token._id = existingUser._id;
+        token.isAdmin = existingUser.isAdmin;
+        token.provider = account.provider;
+
+        await db.disconnect();
       }
 
       return token;
     },
+
     async session({ session, token }) {
-      if (token?._id) {
-        session.user._id = token._id;
-      }
-
-      if (token?.isAdmin) {
-        session.user.isAdmin = token.isAdmin;
-      }
-
+      if (token?._id) session.user._id = token._id;
+      if (token?.isAdmin) session.user.isAdmin = token.isAdmin;
+      if (token?.provider) session.user.provider = token.provider;
       return session;
     },
   },
+
   providers: [
+    // Credentials login
     CredentialsProvider({
-      async authorize(creadentials) {
-        console.log("authorize called");
-        console.log("connect running...");
+      async authorize(credentials) {
         await db.connect();
 
-        console.log("findOne called");
-        console.log("findOne running...");
-        // const user = await User.findOne({
-        //   email: creadentials.email,
-        // });
-
-        if (typeof creadentials.email !== "string" ||
-          !/^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$/i.test(creadentials.email)) {
+        // Validate input first
+        if (
+          typeof credentials.email !== "string" ||
+          !/^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$/i.test(credentials.email)
+        ) {
+          await db.disconnect();
           throw new Error("Invalid email format");
         }
 
-        if (typeof creadentials.password !== "string" || creadentials.password.length < 6) {
+        if (
+          typeof credentials.password !== "string" ||
+          credentials.password.length < 6
+        ) {
+          await db.disconnect();
           throw new Error("Invalid password");
         }
 
-        const user = await User.findOne({ email: creadentials.email }).lean();
-
-        console.log("user is:-", user);
-
-        console.log("disconnect called");
-        console.log("disconnect running...");
+        // Look up user
+        const user = await User.findOne({ email: credentials.email }).lean();
         await db.disconnect();
 
-        console.log("retruning...");
-        if (
-          user &&
-          bcryptjs.compareSync(creadentials.password, user.password)
-        ) {
-          return {
-            _id: user._id,
-            name: user.name,
-            email: user.email,
-            image: "image",
-            isAdmin: user.isAdmin,
-          };
+        if (!user) {
+          throw new Error("Invalid email or password");
         }
 
-        throw new Error("Invalid email or password");
+        // If user has no password (OAuth-only account)
+        if (!user.password) {
+          throw new Error(
+            "This account is registered via Google/GitHub. Please log in with that provider."
+          );
+        }
+
+        // Compare password
+        const isValid = await bcryptjs.compare(credentials.password, user.password);
+        if (!isValid) {
+          throw new Error("Invalid email or password");
+        }
+
+        // Return safe user object
+        return {
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+          isAdmin: user.isAdmin,
+        };
       },
+    }),
+
+    // Google OAuth
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    }),
+
+    // GitHub OAuth
+    GithubProvider({
+      clientId: process.env.GITHUB_CLIENT_ID,
+      clientSecret: process.env.GITHUB_CLIENT_SECRET,
     }),
   ],
 });
