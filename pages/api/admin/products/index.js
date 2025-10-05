@@ -1,23 +1,29 @@
 import Product from "@/models/Product";
 import db from "@/utils/db";
 import { getSession } from "next-auth/react";
+import { verifyCsrfToken } from "@/utils/csrf";
 
 const handler = async (req, res) => {
+  const csrfToken = req.headers["x-csrf-token"];
+  if (!verifyCsrfToken(csrfToken)) {
+    return res.status(403).json({ message: "Invalid CSRF token" });
+  }
+
   const session = await getSession({ req });
-  if (!session || (session && !session.user.isAdmin)) {
-    res.status(401).send("Admin signin required");
+  if (!session || !session.user?.isAdmin) {
+    return res.status(401).json({ message: "Admin signin required" });
   }
-  if (req.method === "GET") {
-    await db.connect();
-    const products = await Product.find({});
-    await db.disconnect();
-    res.send(products);
-  }
-  if (req.method === "POST") {
-    return postHandler(req, res);
-  } else {
-    return res.status(400).send({ message: "Method not allowed" });
-  }
+
+  if (req.method === "GET") return getHandler(req, res);
+  if (req.method === "POST") return postHandler(req, res);
+  return res.status(400).json({ message: "Method not allowed" });
+};
+
+const getHandler = async (req, res) => {
+  await db.connect();
+  const products = await Product.find({});
+  await db.disconnect();
+  res.status(200).json(products);
 };
 
 const postHandler = async (req, res) => {
@@ -39,16 +45,9 @@ const postHandler = async (req, res) => {
     isFeatured: false,
     banner: "",
   });
-
-  console.log("post called....");
-  console.log(newProduct);
-
   const product = await newProduct.save();
   await db.disconnect();
-  res.send({
-    message: "Product created succssfully",
-    product,
-  });
+  res.status(201).json({ message: "Product created successfully", product });
 };
 
 export default handler;

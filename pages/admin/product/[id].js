@@ -45,12 +45,20 @@ export default function ProductEditScreen() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const { data: csrf } = await axios.get("/api/auth/csrf-token");
-      setCsrfToken(csrf.csrfToken);
       try {
+        // Get a fresh CSRF token
+        const { data: csrf } = await axios.get("/api/auth/csrf-token");
+        setCsrfToken(csrf.csrfToken);
+
         dispatch({ type: "FETCH_REQUEST" });
-        const { data } = await axios.get(`/api/admin/products/${productId}`);
+        // Include the CSRF token in the GET request headers
+        const { data } = await axios.get(`/api/admin/products/${productId}`, {
+          headers: { "x-csrf-token": csrf.csrfToken },
+        });
+
         dispatch({ type: "FETCH_SUCCESS" });
+
+        // Prefill form fields
         setValue("name", data.name);
         setValue("slug", data.slug);
         setValue("price", data.price);
@@ -61,8 +69,10 @@ export default function ProductEditScreen() {
         setValue("description", data.description);
       } catch (error) {
         dispatch({ type: "FETCH_FAIL", payload: getError(error) });
+        toast.error(getError(error));
       }
     };
+
     if (productId) fetchData();
   }, [productId, setValue]);
 
